@@ -78,10 +78,10 @@ class Player:
     def info(self) -> str:
         return f"ID: {self.ID}\n" \
                f"{self.t('Name')}: {self.name}\n" \
-               f"{self.t('Location')}: {self.location['location']}\n" \
-               f"{self.t('Status')}: {self.location['status']}\n" \
-               f"{self.t('Cloths')}: {self.equipment['cloths']}\n" \
-               f"{self.t('Weapon')}: {self.equipment['weapon']}\n" \
+               f"{self.t('Location')}: {self.t(self.location['location'])}\n" \
+               f"{self.t('Status')}: {self.t(self.location['status'])}\n" \
+               f"{self.t('Cloths')}: {self.t(self.equipment['cloths'])}\n" \
+               f"{self.t('Weapon')}: {self.t(self.equipment['weapon'])}\n" \
                f"HP: {self.hp}\n" \
                f"{self.t('Damage')}: {self.damage()}\n" \
                f"{self.t('Experience')}: {self.experience}\n" \
@@ -91,6 +91,8 @@ class Player:
         info = ""
         for item_name in self.inventory:
             info += f"{self.t(item_name)} -> {self.inventory[item_name]}\n"
+        if info == "":
+            return self.t("Your inventory is empty")
         return info
 
     def buttons_sell(self) -> list:
