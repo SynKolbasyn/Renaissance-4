@@ -3,3 +3,4 @@ logs.log
 game_data/
 players_data/
 src/__pycache__/
+.idea/

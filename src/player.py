@@ -9,7 +9,8 @@ def get_dict_from_json(file_name: str) -> dict:
 
 class Player:
     def __init__(self, ID: int, login: str, name: str, language: str, location: dict, previous_locations: list, hp: int,
-                 experience: int, money: int, equipment: dict, inventory: dict, enemies: dict, buttons: list):
+                 experience: int, reputation: int, money: int, equipment: dict, inventory: dict, tasks: dict,
+                 enemies: dict, buttons: list):
         self.ID = ID
         self.login = login
         self.name = name
@@ -18,9 +19,11 @@ class Player:
         self.previous_locations = previous_locations
         self.hp = hp
         self.experience = experience
+        self.reputation = reputation
         self.money = money
         self.equipment = equipment
         self.inventory = inventory
+        self.tasks = tasks
         self.enemies = enemies
         self.buttons = buttons
 
@@ -35,6 +38,9 @@ class Player:
 
     def ITEMS(self) -> dict:
         return get_dict_from_json("../game_data/items.json")
+
+    def TASKS(self) -> dict:
+        return get_dict_from_json("../game_data/tasks.json")
 
     def NPCS(self) -> dict:
         return get_dict_from_json("../game_data/npcs.json")
@@ -52,9 +58,11 @@ class Player:
             "previous_locations": self.previous_locations,
             "hp": self.hp,
             "experience": self.experience,
+            "reputation": self.reputation,
             "money": self.money,
             "equipment": self.equipment,
             "inventory": self.inventory,
+            "tasks": self.tasks,
             "enemies": self.enemies,
             "buttons": self.buttons
         }
@@ -67,7 +75,7 @@ class Player:
         return self.ITEMS()[self.equipment["weapon"]]["damage"]
 
     def t(self, string: str) -> str:
-        return self.TRANSLATIONS()[string]
+        return self.TRANSLATIONS()[string] if string in self.TRANSLATIONS().keys() else string
 
     def tl(self, array: list) -> list:
         t_array = []
@@ -85,7 +93,16 @@ class Player:
                f"HP: {self.hp}\n" \
                f"{self.t('Damage')}: {self.damage()}\n" \
                f"{self.t('Experience')}: {self.experience}\n" \
+               f"{self.t('Reputation')}: {self.reputation}\n" \
                f"{self.t('Money')}: {self.money}"
+
+    def tasks_info(self) -> str:
+        if self.tasks == {}:
+            return self.t("You have not got any task")
+        answer = ""
+        for index, task in enumerate(self.tasks):
+            answer += f"{index + 1}. {task} -> {self.tasks[task]['progres']}/{self.tasks[task]['goal']}\n"
+        return answer[:-1]
 
     def inventory_info(self) -> str:
         info = ""
@@ -134,6 +151,21 @@ class Player:
         use_items.append(self.t("Leave"))
         return use_items
 
+    def buttons_accepts_task(self) -> list:
+        tasks = []
+        for task in self.TASKS():
+            if self.location["location"] == self.TASKS()[task]["location"]:
+                tasks.append(task)
+        tasks.append(self.t("Leave"))
+        return tasks
+
+    def buttons_submits_task(self) -> list:
+        tasks = []
+        for task in self.tasks:
+            tasks.append(task)
+        tasks.append(self.t("Leave"))
+        return tasks
+
     def dynamic_buttons(self) -> list:
         if self.location["status"] == "Sell":
             return self.buttons_sell()
@@ -145,6 +177,10 @@ class Player:
             return self.buttons_equip()
         if self.location["status"] == "Use":
             return self.buttons_use()
+        if self.location["status"] == "Accepts task":
+            return self.buttons_accepts_task()
+        if self.location["status"] == "Submits task":
+            return self.buttons_submits_task()
 
     def update_buttons(self):
         if self.STATUSES()[self.location["status"]]["type"] == "new actions":
@@ -152,7 +188,7 @@ class Player:
         elif self.STATUSES()[self.location["status"]]["type"] == "dynamic actions":
             self.buttons = self.dynamic_buttons()
         else:
-            self.buttons =  self.tl(self.LOCATIONS()[self.location["location"]]["actions"])
+            self.buttons = self.tl(self.LOCATIONS()[self.location["location"]]["actions"])
         if self.location["location"] != "Inventory":
             self.buttons.append(self.t("Inventory"))
 
@@ -187,7 +223,7 @@ class Player:
             return self.t("You are already here or you can't go there")
         self.previous_locations.append(self.location)
         self.location = self.ACTIONS()[action]["location_arrive"]
-        while len(self.previous_locations) > 10:
+        while len(self.previous_locations) > 25:
             self.previous_locations.pop(0)
         return self.t(self.ACTIONS()[action]["description"])
 
@@ -199,6 +235,9 @@ class Player:
         self.experience += self.enemies[enemy_name]["experience"]
         drop = random.choice(self.enemies[enemy_name]["drop"])
         self.add_to_inventory(drop, 1)
+        for task in self.tasks:
+            if (self.tasks[task]["enemy"] == enemy_name) and self.TASKS()[task]["type"] == "kill":
+                self.tasks[task]["progres"] += 1
         return drop
 
     def beat_enemy(self, enemy_name: str) -> str:
@@ -288,22 +327,42 @@ class Player:
         for enemy_name in self.enemies:
             self.hp -= self.constrain_damage(enemy_name)
             answer += f"{self.t('You are being attacked by')}: {self.t(enemy_name)}\n" \
-                      f"{self.t('You took damage')}: {self.enemies[enemy_name]['damage']}\n" \
+                      f"{self.t('You took damage')}: {self.constrain_damage(enemy_name)}\n" \
                       f"{self.t('Your hp')}: {self.hp}\n"
         return answer[:-1]
 
     def is_dead(self) -> bool:
         return self.hp <= 0
 
-    def dead_script(self):
+    def dead_script(self) -> str:
         self.location = {"location": "Forest", "status": "Stay"}
         self.previous_locations = []
         self.hp = 100
         self.experience = 0
+        self.reputation = 0
         self.money = 0
         self.equipment = {"cloths": "Rags", "weapon": "Stick"}
         self.inventory = {}
+        self.tasks = {}
         self.enemies = {}
+        return self.t("You are dead")
+
+    def action_accepts_task(self, task: str) -> str:
+        if task in self.tasks.keys():
+            return self.t("You already accept this task")
+        self.tasks[task] = {"enemy": self.TASKS()[task]["enemy"], "goal": self.TASKS()[task]["goal"], "progres": 0}
+        return f"{self.t('You accepted task')}\n{self.t(self.TASKS()[task]['description'])}"
+
+    def action_submits_task(self, task: str) -> str:
+        if task not in self.tasks.keys():
+            return self.t("You have not got this task")
+        if self.tasks[task]["progres"] >= self.tasks[task]["goal"]:
+            self.experience += self.TASKS()[task]["reward"]["experience"]
+            self.reputation += self.TASKS()[task]["reward"]["reputation"]
+            self.money += self.TASKS()[task]["reward"]["money"]
+            del self.tasks[task]
+            return self.t("You submitted task")
+        return self.t("You do not complete task")
 
     def perform_action(self, action: str) -> str:
         action = self.t(action)
@@ -324,7 +383,11 @@ class Player:
             answer += self.action_equip(action) + "\n"
         if self.ACTIONS()[action]["type"] == "item" and self.location["status"] == "Use":
             answer += self.action_use(action) + "\n"
-        answer += self.get_enemies_damage()
+        if self.ACTIONS()[action]["type"] == "task" and self.location["status"] == "Accepts task":
+            answer += self.action_accepts_task(action) + "\n"
+        if self.ACTIONS()[action]["type"] == "task" and self.location["status"] == "Submits task":
+            answer += self.action_submits_task(action) + "\n"
+        answer += self.get_enemies_damage() + "\n"
         if self.is_dead():
             answer += self.dead_script()
         self.update_buttons()

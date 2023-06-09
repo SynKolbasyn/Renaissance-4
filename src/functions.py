@@ -10,18 +10,19 @@ def get_dict_from_json(file_name: str) -> dict:
 
 
 def create_new_account(ID: int, login: str, name: str) -> player.Player:
-    account = player.Player(ID, login, name, "en", {"location": "Forest", "status": "Stay"}, [], 100, 0, 0,
-                            {"cloths": "Rags", "weapon": "Stick"}, {}, {}, ["en", "ru"])
+    account = player.Player(ID, login, name, "en", {"location": "Forest", "status": "Stay"}, [], 100, 0, 0, 0,
+                            {"cloths": "Rags", "weapon": "Stick"}, {}, {}, {}, ["en", "ru"])
     account.update_data()
     return account
 
 
 def create_exist_account(ID: int) -> player.Player:
     player_data = get_dict_from_json(f"../players_data/{ID}.json")
-    return player.Player(player_data["ID"], player_data["login"], player_data["name"],
-                         player_data["language"], player_data["location"], player_data["previous_locations"],
-                         player_data["hp"], player_data["experience"], player_data["money"], player_data["equipment"],
-                         player_data["inventory"], player_data["enemies"], player_data["buttons"])
+    return player.Player(player_data["ID"], player_data["login"], player_data["name"], player_data["language"],
+                         player_data["location"], player_data["previous_locations"], player_data["hp"],
+                         player_data["experience"], player_data["reputation"], player_data["money"],
+                         player_data["equipment"], player_data["inventory"], player_data["tasks"],
+                         player_data["enemies"], player_data["buttons"])
 
 
 def except_new_account(ID: int, login: str, name: str) -> player.Player:
@@ -48,3 +49,8 @@ def get_player_info(ID: int, login: str, name: str) -> str:
 def get_player_inventory_info(ID: int, login: str, name: str) -> str:
     account = except_new_account(ID, login, name)
     return account.inventory_info()
+
+
+def get_tasks_progres(ID: int, login: str, name: str) -> str:
+    account = except_new_account(ID, login, name)
+    return account.tasks_info()
